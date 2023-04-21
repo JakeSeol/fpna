@@ -1,3 +1,15 @@
+-- 22/10/18 : 퍼포먼스 마케팅 5번 항목에 추가
+-- 22/10/24 : 1P 매출액, GMV에 배송조립비 포함하도록 변경
+-- 22/11/16 : 1P와 SKU의 매핑을 인식하는 서브쿼리 변경
+-- 22/11/21 : 배송조립비 매출 인식 시작, 결제기준 11/01 부터
+-- 22/12/14 : fin_coupon_conditions_md과 fin_coupon_conditions_md_old 를 union 후 join으로 변경
+-- 23/01/30 : Kuro님 1P 쿼리 반영
+-- 23/02/13 : Instant discount funding 추가
+-- 23/03/06 : finance.fin_transport_fee_calculate_options_monthly 테이블의 중복 옵션 제거
+-- 23/03/06 : round 삽입 및 coupon_cost 관련 총액 - 나머지 = other 로 계산방식변경, Mgmt PL로 명칭 변경
+-- 23/03/20 : finance.monthly_sku_orderprice의 방어로직 추가
+-- 23/03/27 : Coupon 테이블 변경 : Cart/Product
+-- 23/04/10 : 카드프로모션 테이블 변경, 포인트 타입 중 O2O 설치수리, O2O 입주청소 추가
 -- 1. Commerce
 with item_sku_mapped as (
 select cast(a.item_id as integer) as item_id
