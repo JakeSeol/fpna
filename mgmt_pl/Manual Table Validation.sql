@@ -1,4 +1,3 @@
--- 0. Validation
 select 'temp.fin_non_3p_seller_current' table_name, sc.seller_id join_key, count(sc.company_name) row_count
 from temp.fin_non_3p_seller_current sc group by 1,2 having count(sc.company_name) > 1
 union all
