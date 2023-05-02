@@ -121,3 +121,4 @@ select yyyymm tran_yyyymm
 from raw_data
 group by 1,2,3
 order by 1,2,3*/
+;

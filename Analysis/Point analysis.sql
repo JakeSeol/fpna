@@ -89,7 +89,7 @@ left join dump_point.point_details pd           on pd.point_id = p.id and pd.ver
 left join first_accum fa                        on fa.detail_first_accum_id = pd.detail_first_accum_id
 
 left join finance.fin_mileage_histories_d mh    on fa.version is null and mh.user_id = cast(p.user_id as varchar) and mh.mileage_id = cast(p.payload as varchar)
-left join dump_point.points mig                on mh.reference_mileage_id = cast(mig.payload as varchar) and mh.user_id = cast(mig.user_id as varchar)
+left join dump_point.points mig                 on mh.reference_mileage_id = cast(mig.payload as varchar) and mh.user_id = cast(mig.user_id as varchar)
 left join dump.order_options oo                 on cast(oo.id as varchar) = coalesce(mig.request_id,p.request_id) and coalesce(if(p.process_type='ACCUM',p.category_type),mig.category_type,fa.category_type) = 'CONFIRM_ORDER'
 -- 구매확정 포인트의 비지니스를 구분하기 위해 만듦
 left join dump.order_productions op     on op.id = oo.order_production_id
