@@ -8,6 +8,9 @@
       <jdbc-driver>com.simba.athena.jdbc42.Driver</jdbc-driver>
       <jdbc-url>jdbc:awsathena://athena.ap-northeast-2.amazonws.com:443/</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
+      <driver-properties>
+        <property name="S3OutputLocation" value="s3://bucketplace-athena-result/" />
+      </driver-properties>
     </data-source>
   </component>
 </project>
