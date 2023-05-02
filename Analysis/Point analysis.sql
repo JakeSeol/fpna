@@ -79,6 +79,7 @@ select if(fa.detail_first_accum_id is not null and fa.version <> 'm','MSA','LEGA
             when coalesce(if(p.process_type='ACCUM',p.category_type),mig.category_type,fa.category_type) is not null then 'EVENT'
             else 'UNKNOWN' end accum_acct_cate,
        if(coalesce(if(p.process_type='ACCUM',p.category_type),mig.category_type,fa.category_type) = 'CONFIRM_ORDER',if(sc.biz in ('1P','PREMIUM'),'1P','3P'),fa.accum_acct_biz) accum_acct_biz,
+       mp.dept accum_dept,
        coalesce(pd.amount,p.amount) amount,
        p.amount point_amount,
        pd.amount detail_amount,
@@ -94,6 +95,7 @@ left join dump.order_options oo                 on cast(oo.id as varchar) = coal
 -- 구매확정 포인트의 비지니스를 구분하기 위해 만듦
 left join dump.order_productions op     on op.id = oo.order_production_id
 left join temp.fin_non_3p_seller_current sc on cast(sc.seller_id as integer) = op.seller_id
+left join finance.mileage_point_type_mapping mp on mp.category_type = coalesce(if(p.process_type='ACCUM',p.category_type),mig.category_type,fa.category_type)
 where p.point_type = 'POINT' and p.service_id = 'OHOUSE'
 )
 ,step_2 as (
@@ -106,6 +108,7 @@ select a.accum_ver,
        coalesce(cast(a.exp_date_pass as varchar),'unknown') exp_date_pass,
        a.accum_acct_cate,
        a.accum_acct_biz,
+       a.accum_dept,
        a.accum_cate,
        a.tran_cate,
        a.process_type,
@@ -131,6 +134,7 @@ select a.accum_ver,
        a.process_type,
        a.accum_acct_cate,
        a.accum_acct_biz,
+       a.accum_dept,
        a.accum_cate,
        a.tran_cate,
        sum(a.amount) amount,
@@ -140,4 +144,4 @@ select a.accum_ver,
        max(a.detail_id) sample_detail_id,
        max(coalesce(a.detail_first_accum_id,a.legacy_accum_id)) sample_first
 from step_2 a
-group by 1,2,3,4,5,6,7,8,9,10,11,12
+group by 1,2,3,4,5,6,7,8,9,10,11,12,13
