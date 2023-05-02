@@ -71,15 +71,13 @@ select if(fa.detail_first_accum_id is not null and fa.version <> 'm','MSA','LEGA
        p.user_id,
        p.process_type,
        p.category_type tran_cate,
-       fa.category_type fa_cate,
-       mig.category_type legacy_cate,
-       coalesce(if(p.process_type='ACCUM',p.category_type),mig.category_type,fa.category_type,'UNKNOWN') accum_cate,
-       case when coalesce(if(p.process_type='ACCUM',p.category_type),mig.category_type,fa.category_type) in ('CONFIRM_ORDER','DECORATIVE_SUPPORT_FUND','EXPIRE','USE_FOR_ORDER','WITHDRAW_BY_ADMIN','WITHDRAW_BY_CANCEL_CONFIRM') then coalesce(if(p.process_type='ACCUM',p.category_type),mig.category_type,fa.category_type)
-            when coalesce(if(p.process_type='ACCUM',p.category_type),mig.category_type,fa.category_type) in ('ORDER_CANCEL','ORDER_REFUND') then 'ORDER_CANCEL/REFUND'
-            when coalesce(if(p.process_type='ACCUM',p.category_type),mig.category_type,fa.category_type) is not null then 'EVENT'
+       case when coalesce(if(p.process_type='ACCUM',p.category_type),fa.category_type,mig.category_type) in ('CONFIRM_ORDER','DECORATIVE_SUPPORT_FUND','EXPIRE','USE_FOR_ORDER','WITHDRAW_BY_ADMIN','WITHDRAW_BY_CANCEL_CONFIRM') then coalesce(if(p.process_type='ACCUM',p.category_type),fa.category_type,mig.category_type)
+            when coalesce(if(p.process_type='ACCUM',p.category_type),fa.category_type,mig.category_type) in ('ORDER_CANCEL','ORDER_REFUND') then 'ORDER_CANCEL/REFUND'
+            when coalesce(if(p.process_type='ACCUM',p.category_type),fa.category_type,mig.category_type) is not null then 'EVENT'
             else 'UNKNOWN' end accum_acct_cate,
-       if(coalesce(if(p.process_type='ACCUM',p.category_type),mig.category_type,fa.category_type) = 'CONFIRM_ORDER',if(sc.biz in ('1P','PREMIUM'),'1P','3P'),fa.accum_acct_biz) accum_acct_biz,
+       if(coalesce(if(p.process_type='ACCUM',p.category_type),fa.category_type,mig.category_type) = 'CONFIRM_ORDER',if(sc.biz in ('1P','PREMIUM'),'1P','3P'),fa.accum_acct_biz) accum_acct_biz,
        mp.dept accum_dept,
+       coalesce(if(p.process_type='ACCUM',p.category_type),fa.category_type,mig.category_type,'UNKNOWN') accum_cate,
        coalesce(pd.amount,p.amount) amount,
        p.amount point_amount,
        pd.amount detail_amount,
@@ -107,8 +105,9 @@ select a.accum_ver,
        coalesce(cast(a.over_1mnth as varchar),'unknown') over_1mnth,
        coalesce(cast(a.exp_date_pass as varchar),'unknown') exp_date_pass,
        a.accum_acct_cate,
-       a.accum_acct_biz,
+       concat(a.accum_acct_cate,if(a.accum_acct_biz is null, null, concat('-',a.accum_acct_biz))) accum_acct_cate_biz,
        a.accum_dept,
+       concat(a.accum_dept,if(a.accum_acct_biz is null, null, concat('-',a.accum_acct_biz))) accum_dept_biz,
        a.accum_cate,
        a.tran_cate,
        a.process_type,
@@ -133,8 +132,9 @@ select a.accum_ver,
        a.exp_date_pass,
        a.process_type,
        a.accum_acct_cate,
-       a.accum_acct_biz,
+       a.accum_acct_cate_biz,
        a.accum_dept,
+       a.accum_dept_biz,
        a.accum_cate,
        a.tran_cate,
        sum(a.amount) amount,
@@ -144,4 +144,4 @@ select a.accum_ver,
        max(a.detail_id) sample_detail_id,
        max(coalesce(a.detail_first_accum_id,a.legacy_accum_id)) sample_first
 from step_2 a
-group by 1,2,3,4,5,6,7,8,9,10,11,12,13
+group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14
