@@ -47,7 +47,7 @@ select pd.detail_first_accum_id,
        p.version,
        p.created_at
 from dump_point.points p
-inner join dump_point.point_details pd   on pd.point_id = p.id and pd.version <> 'm'
+inner join dump_point.point_details pd   on pd.point_id = p.id -- and pd.version <> 'm'
 left join dump.order_options oo          on cast(oo.id as varchar) = p.request_id and p.category_type = 'CONFIRM_ORDER'
 -- 구매확정 포인트의 비지니스를 구분하기 위해 만듦
 left join dump.order_productions op on op.id = oo.order_production_id
@@ -57,12 +57,12 @@ where pd.detail_first_accum_id = pd.id
 group by 1,2,3,4,5,6,7
 )
 ,step_1 as (
-select if(fa.detail_first_accum_id is not null,'MSA','LEGACY') accum_ver,
+select if(fa.detail_first_accum_id is not null and fa.version <> 'm','MSA','LEGACY') accum_ver,
        cast(p.created_at as date) tran_dt,
-       cast(coalesce(fa.created_at,mig.created_at,if(p.process_type='ACCUM',p.created_at)) as date) accum_dt,
+       cast(coalesce(if(p.process_type='ACCUM',p.created_at),fa.created_at,mig.created_at) as date) accum_dt,
        coalesce(pd.use_end_date,p.use_end_date,mig.use_end_date) exp_date,
-       cast(date_diff('month',cast(coalesce(fa.created_at,mig.created_at,if(p.process_type='ACCUM',p.created_at)) as date),coalesce(pd.use_end_date,p.use_end_date,mig.use_end_date)) > 1 as varchar) over_1mnth,
-       coalesce(pd.use_end_date,p.use_end_date) < current_date - interval '1' day exp_date_pass, -- Pass 는 mig을 사용하지 않음. mig
+       cast(date_diff('month',cast(coalesce(if(p.process_type='ACCUM',p.created_at),fa.created_at,mig.created_at) as date),coalesce(pd.use_end_date,p.use_end_date,mig.use_end_date)) > 1 as varchar) over_1mnth,
+       case when coalesce(pd.use_end_date,p.use_end_date,mig.use_end_date) is null then 'unknown' else cast(coalesce(pd.use_end_date,p.use_end_date,mig.use_end_date) < current_date - interval '1' day as varchar) end exp_date_pass, -- Pass 는 mig을 사용하지 않음. mig
        p.version,
        p.id point_id,
        pd.id detail_id,
@@ -85,17 +85,16 @@ select if(fa.detail_first_accum_id is not null,'MSA','LEGACY') accum_ver,
        round(cast(coalesce(pd.amount,p.amount) as double) * coalesce(mh.mileage,1) / sum(coalesce(mh.mileage,1)) over (partition by coalesce(pd.id,p.id)),0) dist_amount,
        row_number() over (partition by coalesce(pd.id,p.id) order by coalesce(mig.id,fa.detail_first_accum_id)) rank
 from dump_point.points p
-left join dump_point.point_details pd           on pd.point_id = p.id and pd.version <> 'm'
+left join dump_point.point_details pd           on pd.point_id = p.id --and pd.version <> 'm'
 left join first_accum fa                        on fa.detail_first_accum_id = pd.detail_first_accum_id
 
-left join finance.fin_mileage_histories_d mh    on fa.version is null and mh.user_id = cast(p.user_id as varchar) and mh.mileage_id = cast(p.payload as varchar)
+left join finance.fin_mileage_histories_d mh    on fa.version is null and mh.user_id = cast(p.user_id as varchar) and mh.mileage_id = p.payload
 left join dump_point.points mig                 on mh.reference_mileage_id = cast(mig.payload as varchar) and mh.user_id = cast(mig.user_id as varchar)
 left join dump.order_options oo                 on cast(oo.id as varchar) = coalesce(mig.request_id,p.request_id) and coalesce(if(p.process_type='ACCUM',p.category_type),mig.category_type,fa.category_type) = 'CONFIRM_ORDER'
 -- 구매확정 포인트의 비지니스를 구분하기 위해 만듦
 left join dump.order_productions op     on op.id = oo.order_production_id
 left join temp.fin_non_3p_seller_current sc on cast(sc.seller_id as integer) = op.seller_id
 where p.point_type = 'POINT' and p.service_id = 'OHOUSE'
---   and to_char(p.created_at,'yyyymm') < '202304'
 )
 ,step_2 as (
 select a.accum_ver,
@@ -118,7 +117,7 @@ select a.accum_ver,
        a.amount total_amount,
        coalesce(case when a.process_type = 'ACCUM' then a.amount
                      when a.rank = 1 then a.amount - sum(coalesce(a.dist_amount,0)) over (partition by a.detail_id,a.point_id) + coalesce(a.dist_amount,0)
-                                     else coalesce(a.dist_amount,0) end,coalesce(a.amount,0)) amount,
+                     else coalesce(a.dist_amount,0) end,coalesce(a.amount,0)) amount,
        a.rank
 from step_1 a
 )
