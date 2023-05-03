@@ -1,3 +1,4 @@
+-- 분석 결과가 이 금액과 동일하면 됨
 -- Should be : total
 select p.version,
        p.process_type,
@@ -8,6 +9,8 @@ where p.point_type = 'POINT' and p.service_id = 'OHOUSE'
 group by 1,2
 order by 1,2
 ;
+-- 탈퇴회원의 만료처리가 제대로 되지 않고 있으나, 향후 개선될 것임
+-- 잔액의 스냅샷인 user_points 테이블과 거래원장인 points의 합산이 맞지 않는것은 모두 탈퇴회원의 만료처리 때문임.
 -- 포인트 잔액차이(탈퇴회원)
 with point_bal as (
 select p.user_id,
@@ -85,18 +88,23 @@ select if(fa.detail_first_accum_id is not null and fa.version <> 'm','MSA','LEGA
        row_number() over (partition by coalesce(pd.id,p.id) order by coalesce(mig.id,fa.detail_first_accum_id)) rank
 from dump_point.points p
 left join dump_point.point_details pd           on pd.point_id = p.id --and pd.version <> 'm'
+-- points 테이블과 detail 테이블을 조인하여 최초 지급내역을 알수 있는데이터를 추적
 left join first_accum fa                        on fa.detail_first_accum_id = pd.detail_first_accum_id
-
+-- with 에서 적용한 first_accum_id 로 추적가능한 대부분의 포인트 데이터를 추적
 left join finance.fin_mileage_histories_d mh    on fa.version is null and mh.user_id = cast(p.user_id as varchar) and mh.mileage_id = p.payload
+-- first_accum_id 로 추적이 안되는것은 finance 테이블로 추적
 left join dump_point.points mig                 on mh.reference_mileage_id = cast(mig.payload as varchar) and mh.user_id = cast(mig.user_id as varchar)
+-- finance 테이블과 MSA points 테이블을 payload(구 mileage id)로 연결
 left join dump.order_options oo                 on cast(oo.id as varchar) = coalesce(mig.request_id,p.request_id) and coalesce(if(p.process_type='ACCUM',p.category_type),mig.category_type,fa.category_type) = 'CONFIRM_ORDER'
--- 구매확정 포인트의 비지니스를 구분하기 위해 만듦
 left join dump.order_productions op     on op.id = oo.order_production_id
 left join temp.fin_non_3p_seller_current sc on cast(sc.seller_id as integer) = op.seller_id
+-- first_accum_id 가 추적되지 않는 구매확정 포인트의 비지니스를 구분하기 위해 만듦
 left join finance.mileage_point_type_mapping mp on mp.category_type = coalesce(if(p.process_type='ACCUM',p.category_type),mig.category_type,fa.category_type)
 where p.point_type = 'POINT' and p.service_id = 'OHOUSE'
 )
 ,step_2 as (
+-- 일자를 월로 변경, 값을 찾을수 없는 경우 unknown 으로 분류
+-- finance 테이블의 금액을 사용하는 경우 배분후 단수 조정
 select a.accum_ver,
        a.version tran_ver,
        to_char(a.tran_dt,'yyyymm') tran_mm,
@@ -123,6 +131,7 @@ select a.accum_ver,
        a.rank
 from step_1 a
 )
+-- 최종 Summarize
 select a.accum_ver,
        a.tran_ver,
        a.tran_mm,
