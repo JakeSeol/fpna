@@ -27,7 +27,7 @@ select pd.detail_first_accum_id,
        p.category_type,
        co.biz
 from dump_point.points p
-inner join dump_point.point_details pd   on pd.point_id = p.id and pd.version <> 'm'
+inner join dump_point.point_details pd   on pd.point_id = p.id -- and pd.version <> 'm'
 left join confrim_order co on co.point_id = p.id
 where pd.detail_first_accum_id = pd.id
 group by 1,2,3 )
@@ -35,7 +35,11 @@ select to_char(p.created_at,'yyyymm') tran_mm,
        wd.first_of_week,
        concat(coalesce(co.biz,fa.biz,''),pm.dept,case when pm.dept = 'OTHER' and sp.point_id is not null then '-SHORT' when pm.dept = 'OTHER' then '-NORMAL' else '' end) department,
        sum(coalesce(pd.amount,p.amount)) point,
-       round(sum(coalesce(pd.amount,p.amount) / case when pm.dept = 'REWARD' and co.biz = 'FOREIGN' then 1 else 1.1 end),0) as ex_vat_point
+       round(sum(coalesce(pd.amount,p.amount) / case when pm.dept = 'REWARD' and co.biz = 'FOREIGN' then 1 else 1.1 end),0) as ex_vat_point,
+       sum(if(p.process_type = 'ACCUM',coalesce(pd.amount,p.amount),0)) accum_point,
+       round(sum(if(p.process_type = 'ACCUM',coalesce(pd.amount,p.amount) / case when pm.dept = 'REWARD' and co.biz = 'FOREIGN' then 1 else 1.1 end),0),0) as accum_ex_vat_point,
+       sum(if(p.process_type = 'WITHDRAW',coalesce(pd.amount,p.amount),0)) withdraw_point,
+       round(sum(if(p.process_type = 'WITHDRAW',coalesce(pd.amount,p.amount) / case when pm.dept = 'REWARD' and co.biz = 'FOREIGN' then 1 else 1.1 end),0),0) as withdraw_ex_vat_point
 from dump_point.points p
 left join dump_point.point_details pd on pd.point_id = p.id
 left join ba_preserved.calendar wd on wd.date = cast(p.created_at as date)
@@ -48,8 +52,8 @@ where p.process_type in ('ACCUM', 'WITHDRAW')
   and cast(p.created_at as date) >= cast('2019-01-01' as date)
 group by 1,2,3
 order by 1,2,3
-
-/* -- 기존 버전
+;
+/*-- 기존 버전
 with rewward_biz_data as (
 select coalesce(sc.biz,'3P')||case when sc.biz = '1P' and dp.id is not null then '-PREMIUM' else '' end biz,
        a.mileage_id,
@@ -120,5 +124,5 @@ select yyyymm tran_yyyymm
      ,sum(point) / case when department = 'FOREIGN-REWARD' then 1 else 1.1 end as ex_vat_point
 from raw_data
 group by 1,2,3
-order by 1,2,3*/
-;
+order by 1,2,3
+*/
