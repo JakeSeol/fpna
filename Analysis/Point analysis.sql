@@ -126,7 +126,7 @@ from step_1 a
 select a.accum_ver,
        a.tran_ver,
        a.tran_mm,
-       a.acumm_mm,
+       a.accum_mm,
        a.exp_mm,
        a.over_1mnth,
        a.exp_date_pass,
