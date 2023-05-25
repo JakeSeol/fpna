@@ -7,7 +7,7 @@
 -- 23/02/13 : Instant discount funding 추가
 -- 23/03/06 : finance.fin_transport_fee_calculate_options_monthly 테이블의 중복 옵션 제거
 -- 23/03/06 : round 삽입 및 coupon_cost 관련 총액 - 나머지 = other 로 계산방식변경, Mgmt PL로 명칭 변경
--- 23/03/20 : finance.monthly_sku_orderprice의 방어로직 추가
+-- 23/03/20 : finance.fin_sku_monthly_orderprice의 방어로직 추가
 -- 23/03/27 : Coupon 테이블 변경 : Cart/Product
 -- 23/04/10 : 카드프로모션 테이블 변경, 포인트 타입 중 O2O 설치수리, O2O 입주청소 추가
 -- 1. Commerce
@@ -27,11 +27,11 @@ where a.sku_rank = 1
   and a.item_rank = 1 )
 ,max_inv as (
 select max(a.yyyymm) max_yyyymm
-from finance.monthly_sku_orderprice a
+from finance.fin_sku_monthly_orderprice a
 )
 ,inventory as (
 select mi.max_yyyymm is not null latest_inv, a.yyyymm, b.item_id, count(distinct a.skucode) as sku_count, sum(b.sku_count) as qty, sum(cast(if(a.orderprice_ex_vat='-','0',a.orderprice_ex_vat) as bigint)*b.sku_count) as orderprice_ex_vat_per_item
-from finance.monthly_sku_orderprice a --22년부터
+from finance.fin_sku_monthly_orderprice a --22년부터
 join item_sku_mapped b on a.skucode = b.sku_code
 left join max_inv mi on mi.max_yyyymm = a.yyyymm
 group by 1,2,3
