@@ -151,11 +151,10 @@ union all select 'inflowchannel' col, 5 code, 'legacy-5' description
 -- o2o impression
 union all select 'o2o_impression' col, 1 code, '시공 우수업체리스트 카드' description
 union all select 'o2o_impression' col, 2 code, '시공 전문가리스트 카드' description
+-- o2o clean channel
+union all select 'clean_channel' col, 1 code, 'O2O홈(직접)' description
+union all select 'clean_channel' col, 2 code, '이사' description
+union all select 'clean_channel' col, 3 code, '입주공구' description
 )
 ;
---insert into finance.o2o_request_code_map_jake
-
-
-
-;
-
+-- insert into finance.o2o_request_code_map_jake
