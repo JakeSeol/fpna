@@ -94,7 +94,7 @@ select to_char(cast(a.date as date),'yyyymm') yyyymm,
                  when sc.biz = 'PREMIUM' then
                  case when b.type is null and (i1.noprice_sku_count != 0 or i1.mgmt_applied_orderprice is null or (i1.noprice_sku_count = 0 and i1.mgmt_applied_orderprice = 0)) then (a.selling_cost/1.1)*0.83
                       else i1.mgmt_applied_orderprice*a.quantity end --프리미엄 선판매
-           else 0 end) as cogs
+           else 0 end) as cogs,
        -sum(case when sc.biz in ('1P','PREMIUM') then a.quantity * coalesce(d.calculated_transport_fee,0) else 0 end) as direct_delivery_cost,
        0 coupon_cost_ecom, 0 coupon_cost_con, 0 coupon_cost_mkt, 0 coupon_cost_other, 0 coupon_cost, 0 deduct_ecom, 0 deduct_con, 0 deduct_mkt, 0 deduct_other, 0 deduct, 0 deposit_ecom, 0 deposit_con, 0 deposit_mkt, 0 deposit_other, 0 deposit, 0 card_discount, 0 ohouse_card_discount, 0 partner_card_discount,
        0 instant_discount_funding
@@ -105,7 +105,6 @@ left join dump.productions p on p.id = a.product_id
 left join dump.orders o on o.id = a.order_id
 left join finance.fin_admin_categories_md cate on cate.admin_category_id = p.admin_category_id
 left join ba_preserved.calendar wd on wd.date = cast(a.date as date)
-left join max_inv mi on mi.max_yyyymm < to_char(cast(a.date as date),'yyyymm')
 left join finance.fin_option_daily_orderprice i1 on (cast(to_char(date(a.order_at),'yyyymmdd') as varchar) = i1.yyyymmdd
                                                        or (cast(to_char(date(a.order_at),'yyyymmdd') as varchar) < '20220101' and i1.yyyymmdd = '20220101'))
                                                        and cast(a.reference_option_id as varchar) = i1.option_id --월별 회계 단가
@@ -270,3 +269,4 @@ left join dump.production_properties dp on dp.production_id = a.product_id and d
 where a.base_date < current_date
 group by 1,2,3,4
 order by 1,2,3,4
+LIMIT 10
