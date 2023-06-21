@@ -269,4 +269,3 @@ left join dump.production_properties dp on dp.production_id = a.product_id and d
 where a.base_date < current_date
 group by 1,2,3,4
 order by 1,2,3,4
-LIMIT 10
