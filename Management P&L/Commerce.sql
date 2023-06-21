@@ -10,33 +10,9 @@
 -- 23/03/20 : finance.fin_sku_monthly_orderprice의 방어로직 추가
 -- 23/03/27 : Coupon 테이블 변경 : Cart/Product
 -- 23/04/10 : 카드프로모션 테이블 변경, 포인트 타입 중 O2O 설치수리, O2O 입주청소 추가
+-- 23/06/21 : 1P, PREMIUM 원가테이블 변경
 -- 1. Commerce
-with item_sku_mapped as (
-select cast(a.item_id as integer) as item_id
-     , a.sku_code
-     , a.quantity as sku_count
-from (
-select *
-     , row_number() over(partition by item_id, sku_code order by created_at desc) as sku_rank
-     , rank() over(partition by item_id order by created_at desc) as item_rank
-     , created_at as start_date
-     , lag(created_at) over(partition by item_id, sku_code order by created_at desc) as end_date
-from dump_logistics_nosnos.product_mapping_histories
-where item_id != sku_code ) a
-where a.sku_rank = 1
-  and a.item_rank = 1 )
-,max_inv as (
-select max(a.yyyymm) max_yyyymm
-from finance.fin_sku_monthly_orderprice a
-)
-,inventory as (
-select mi.max_yyyymm is not null latest_inv, a.yyyymm, b.item_id, count(distinct a.skucode) as sku_count, sum(b.sku_count) as qty, sum(cast(if(a.orderprice_ex_vat='-','0',a.orderprice_ex_vat) as bigint)*b.sku_count) as orderprice_ex_vat_per_item
-from finance.fin_sku_monthly_orderprice a --22년부터
-join item_sku_mapped b on a.skucode = b.sku_code
-left join max_inv mi on mi.max_yyyymm = a.yyyymm
-group by 1,2,3
-having sum(cast(if(a.orderprice_ex_vat='-','0',a.orderprice_ex_vat) as bigint)*b.sku_count)  > 0 )
-,raw_data as (
+with raw_data as (
 -- 2019년 데이터
 select to_char(cast(a.order_at as date),'yyyymm') yyyymm,
        wd.first_of_week,
@@ -109,12 +85,16 @@ select to_char(cast(a.date as date),'yyyymm') yyyymm,
                 else 0 end * ( a.delivery + a.assemble + a.backwoods ),0) ) dab_revenue,
        sum(a.delivery + a.assemble + a.backwoods) dab,
        sum(a.quantity) qty,
-       -sum(round(case when sc.biz = '1P' and b.type = 'PB'       then coalesce(coalesce(i1.orderprice_ex_vat_per_item,i2.orderprice_ex_vat_per_item)*a.quantity,(a.selling_cost/1.1)*0.69) -- PB 상품
-                       when sc.biz = '1P' and b.type = 'RB'       then coalesce(coalesce(i1.orderprice_ex_vat_per_item,i2.orderprice_ex_vat_per_item)*a.quantity,(a.selling_cost/1.1)*0.74) -- RB 상품
-                       when sc.biz = '1P' and b.type = '사입'      then coalesce(coalesce(i1.orderprice_ex_vat_per_item,i2.orderprice_ex_vat_per_item)*a.quantity,(a.selling_cost/1.1)*0.79) -- 사입 상품
-                       when sc.biz = '1P' and b.type is null      then coalesce(coalesce(i1.orderprice_ex_vat_per_item,i2.orderprice_ex_vat_per_item)*a.quantity,(a.selling_cost/1.1)*0.83) -- 프리미엄 후판매
-                       when sc.biz = 'PREMIUM' and b.type is null then coalesce(coalesce(i1.orderprice_ex_vat_per_item,i2.orderprice_ex_vat_per_item)*a.quantity,(a.selling_cost/1.1)*0.83) -- 프리미엄 선판매
-                       else 0 end,0)) cogs, --★
+       -sum(case when sc.biz = '1P' then
+                 case when b.type ='PB' and (i1.noprice_sku_count != 0 or i1.mgmt_applied_orderprice is null or (i1.noprice_sku_count = 0 and i1.mgmt_applied_orderprice = 0)) then (a.selling_cost/1.1)*0.69
+                      when b.type ='RB' and (i1.noprice_sku_count != 0 or i1.mgmt_applied_orderprice is null or (i1.noprice_sku_count = 0 and i1.mgmt_applied_orderprice = 0)) then (a.selling_cost/1.1)*0.74
+                      when b.type ='사입' and (i1.noprice_sku_count != 0 or i1.mgmt_applied_orderprice is null or (i1.noprice_sku_count = 0 and i1.mgmt_applied_orderprice = 0)) then (a.selling_cost/1.1)*0.79
+                      when b.type is null and (i1.noprice_sku_count != 0 or i1.mgmt_applied_orderprice is null or (i1.noprice_sku_count = 0 and i1.mgmt_applied_orderprice = 0)) then (a.selling_cost/1.1)*0.83 --프리미엄 후판매
+                      else i1.mgmt_applied_orderprice*a.quantity end
+                 when sc.biz = 'PREMIUM' then
+                 case when b.type is null and (i1.noprice_sku_count != 0 or i1.mgmt_applied_orderprice is null or (i1.noprice_sku_count = 0 and i1.mgmt_applied_orderprice = 0)) then (a.selling_cost/1.1)*0.83
+                      else i1.mgmt_applied_orderprice*a.quantity end --프리미엄 선판매
+           else 0 end) as cogs
        -sum(case when sc.biz in ('1P','PREMIUM') then a.quantity * coalesce(d.calculated_transport_fee,0) else 0 end) as direct_delivery_cost,
        0 coupon_cost_ecom, 0 coupon_cost_con, 0 coupon_cost_mkt, 0 coupon_cost_other, 0 coupon_cost, 0 deduct_ecom, 0 deduct_con, 0 deduct_mkt, 0 deduct_other, 0 deduct, 0 deposit_ecom, 0 deposit_con, 0 deposit_mkt, 0 deposit_other, 0 deposit, 0 card_discount, 0 ohouse_card_discount, 0 partner_card_discount,
        0 instant_discount_funding
@@ -126,9 +106,9 @@ left join dump.orders o on o.id = a.order_id
 left join finance.fin_admin_categories_md cate on cate.admin_category_id = p.admin_category_id
 left join ba_preserved.calendar wd on wd.date = cast(a.date as date)
 left join max_inv mi on mi.max_yyyymm < to_char(cast(a.date as date),'yyyymm')
-left join inventory i1 on ( to_char(date_add('month',-1,cast(a.date as date)),'yyyymm') = i1.yyyymm or ( to_char(cast(a.date as date),'yyyymm') < '202201' and i1.yyyymm = '202201' ) ) --★
-                                                                                      and a.reference_option_id = i1.item_id --월별 회계 단가
-left join inventory i2 on mi.max_yyyymm is not null and i2.latest_inv = true and a.reference_option_id = i2.item_id --월별 회계 단가
+left join finance.fin_option_daily_orderprice i1 on (cast(to_char(date(a.order_at),'yyyymmdd') as varchar) = i1.yyyymmdd
+                                                       or (cast(to_char(date(a.order_at),'yyyymmdd') as varchar) < '20220101' and i1.yyyymmdd = '20220101'))
+                                                       and cast(a.reference_option_id as varchar) = i1.option_id --월별 회계 단가
 left join finance.fin_transport_fee_calculate_options_monthly as d on a.reference_option_id = cast(d.option_id as bigint) and to_char(cast(a.date as date),'yyyymm') = d.yyyymm
 left join ba.pbc_products b on a.product_id = b.production_id
 left join dump.production_properties dp on dp.production_id = a.product_id and dp.property_number = 0 --★
